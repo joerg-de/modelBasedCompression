@@ -11,7 +11,6 @@ static int bridge_slot_mod_exec(PyObject* module) {
     if (tochMClass == NULL) {
         return -1;
     }
-    Py_INCREF(tochMClass);
 
     if (PyModule_AddObject(module, "pytorchModel", tochMClass) < 0) {
         Py_DECREF(tochMClass);

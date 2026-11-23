@@ -6,7 +6,7 @@ class PythonCallBackThrottlerError : public std::exception {
   public:
     PythonCallBackThrottlerError() = default;
     const char* what() const noexcept override {
-        return "PythonCallBackThrottlerError";
+        return "Python callback throttler interrupted";
     }
 };
 

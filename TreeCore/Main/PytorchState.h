@@ -11,7 +11,7 @@
 #include "PytorchModel.h"
 
 #include "Settings.h"
-#ifdef USE_COSTOME_ALLOC
+#ifdef USE_CUSTOM_ALLOC
 #include "stackAllocOptimizer.hpp"
 #endif
 #ifdef SUPPORT_RANGE_CODING
@@ -20,9 +20,9 @@
 
 class PytorchState {
   public:
-    PytorchState(std::shared_ptr<PytorchModel> parrent);
-    PytorchModel* getParrent() {
-        return parrent.get();
+    PytorchState(std::shared_ptr<PytorchModel> parent);
+    PytorchModel* getParent() const {
+        return parent.get();
     }
     void resetHidden();
     std::shared_ptr<PytorchState> cloneState() const;
@@ -69,12 +69,12 @@ class PytorchState {
 #endif
 
   private:
-    double CorrectBlacklist(unsigned int* last, float* output_list);
+    double correctBlacklist(unsigned int* last, float* output_list);
     void runForward(int nextChar, double corrVactor, const c10::IValue* in_hidden, c10::IValue* out_hidden,
                     at::Tensor* output_list);
 #ifdef SUPPORT_HUFFMAN
     // sort for speedup so most used to least used
-#ifdef USE_COSTOME_ALLOC
+#ifdef USE_CUSTOM_ALLOC
     stack_allocator<Node> MainNodeAllocer;
     std::set<Node, std::less<Node>, stack_allocator<Node>>
     model_create_node_list(Hidden& hidden, double corrVactor, unsigned int HuffMaxExtend, double huffMin);
@@ -88,13 +88,13 @@ class PytorchState {
 #endif
     std::vector<std::string> BuildMiddel(const Node* currentNode, unsigned int HuffMaxExtend);
 #endif
-    std::shared_ptr<PytorchModel> parrent;
+    std::shared_ptr<PytorchModel> parent;
 #ifdef SUPPORT_RANGE_CODING
     BigUInt Min;
     BigUInt Max;
 #endif
 #ifdef SUPPORT_HUFFMAN
-#if !defined(USE_COSTOME_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
     std::vector<Node> NodesVec;
 #endif
     // global Garbage collection Speedup

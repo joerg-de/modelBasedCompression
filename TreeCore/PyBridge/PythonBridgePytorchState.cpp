@@ -1,9 +1,13 @@
+#define PY_SSIZE_T_CLEAN
+
 #include "PythonBridgePytorchState.h"
 #include "PythonCallBackThrottler.h"
 #include <Python.h>
+#include <cassert>
 #include <exception>
-
-using namespace std::placeholders;
+#include <mutex>
+#include <string>
+#include <tuple>
 
 PyObject* pythonBridgePytorchState_new(PyTypeObject* type, PyObject* args, PyObject* kwds) {
 
@@ -46,7 +50,6 @@ void pythonBridgePytorchState_dealloc(pythonBridgePytorchStateObject* self) {
     }
 
     tp->tp_free(self);
-    Py_DECREF(tp);
 }
 
 PyObject* pythonBridgePytorchState_decodeToBinary(PyObject* self, PyObject* args) {
@@ -72,7 +75,7 @@ PyObject* pythonBridgePytorchState_decodeToBinary(PyObject* self, PyObject* args
     Py_INCREF(callBack);
 
     std::tuple<std::string, unsigned int, unsigned int> res;
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     {
         PyThreadState* _save;
         _save = PyEval_SaveThread();
@@ -119,7 +122,7 @@ PyObject* pythonBridgePytorchState_decodeToBinaryRangeCoding(PyObject* self, PyO
     }
     Py_INCREF(callBack);
 
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     std::tuple<std::string, int> res;
     {
         PyThreadState* _save;
@@ -169,7 +172,7 @@ PyObject* pythonBridgePytorchState_decodeFromBinary(PyObject* self, PyObject* ar
 
     std::tuple<std::string, int> res;
 
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     {
         PyThreadState* _save;
         _save = PyEval_SaveThread();
@@ -191,7 +194,7 @@ PyObject* pythonBridgePytorchState_decodeFromBinary(PyObject* self, PyObject* ar
 
     std::string output = std::get<0>(res);
     int leftover = std::get<1>(res);
-    return Py_BuildValue("(yi)", output.c_str(), leftover);
+    return Py_BuildValue("(y#i)", output.data(), output.length(), leftover);
 }
 
 PyObject* pythonBridgePytorchState_initRangeCoding(PyObject* self, PyObject* args) {
@@ -203,7 +206,7 @@ PyObject* pythonBridgePytorchState_initRangeCoding(PyObject* self, PyObject* arg
     if (!PyArg_ParseTuple(args, "I", &normalBufferSize))
         return NULL;
 
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     try {
         _self->m_pytorchModel->initRangeCoding(normalBufferSize);
     } catch (std::exception& except) {
@@ -239,7 +242,7 @@ PyObject* pythonBridgePytorchState_decodeFromBinaryRangeCoding(PyObject* self, P
 
     std::tuple<std::string, int> res;
 
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     {
         PyThreadState* _save;
         _save = PyEval_SaveThread();
@@ -261,7 +264,7 @@ PyObject* pythonBridgePytorchState_decodeFromBinaryRangeCoding(PyObject* self, P
 
     std::string output = std::get<0>(res);
     int leftover = std::get<1>(res);
-    return Py_BuildValue("(yi)", output.c_str(), leftover);
+    return Py_BuildValue("(y#i)", output.data(), output.length(), leftover);
 }
 
 PyObject* pythonBridgePytorchState_runWithoutDecoding(PyObject* self, PyObject* args) {
@@ -281,7 +284,7 @@ PyObject* pythonBridgePytorchState_runWithoutDecoding(PyObject* self, PyObject* 
     }
     Py_INCREF(callBack);
 
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     {
         PyThreadState* _save;
         _save = PyEval_SaveThread();
@@ -307,12 +310,11 @@ PyObject* pythonBridgePytorchState_cloneDecState(PyObject* self, [[maybe_unused]
     assert(self);
 
     auto _self = reinterpret_cast<pythonBridgePytorchStateObject*>(self);
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
 
     PyTypeObject* tp = Py_TYPE(self);
 
     PyObject* pyResObj = pythonBridgePytorchState_new(tp, nullptr, nullptr);
-    Py_INCREF(pyResObj);
 
     auto _pyResObj = reinterpret_cast<pythonBridgePytorchStateObject*>(pyResObj);
 
@@ -326,11 +328,11 @@ PyObject* pythonBridgePytorchState_cloneDecState(PyObject* self, [[maybe_unused]
     return pyResObj;
 }
 
-PyObject* pythonBridgePytorchState_inLasterCreatedNodes(PyObject* self, PyObject* args) {
+PyObject* pythonBridgePytorchState_inLastCreatedNodes(PyObject* self, PyObject* args) {
     assert(self);
 
     auto _self = reinterpret_cast<pythonBridgePytorchStateObject*>(self);
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     const char* toFind;
     if (!PyArg_ParseTuple(args, "y", &toFind))
         return NULL;
@@ -351,7 +353,7 @@ PyObject* pythonBridgePytorchState_resetDecState(PyObject* self, [[maybe_unused]
     assert(self);
 
     auto _self = reinterpret_cast<pythonBridgePytorchStateObject*>(self);
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     try {
         _self->m_pytorchModel->resetHidden();
     } catch (std::exception& except) {
@@ -365,7 +367,7 @@ PyObject* pythonBridgePytorchState_getMin(PyObject* self, [[maybe_unused]] PyObj
     assert(self);
 
     auto _self = reinterpret_cast<pythonBridgePytorchStateObject*>(self);
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     BigUInt min;
     try {
         min = _self->m_pytorchModel->getMin();
@@ -374,14 +376,14 @@ PyObject* pythonBridgePytorchState_getMin(PyObject* self, [[maybe_unused]] PyObj
         return nullptr;
     }
     auto res = min.toString();
-    return PyUnicode_DecodeUTF8(res.c_str(), res.size(), nullptr);
+    return PyUnicode_DecodeUTF8(res.c_str(), res.size(), "strict");
 }
 
 PyObject* pythonBridgePytorchState_getMax(PyObject* self, [[maybe_unused]] PyObject* unused) {
     assert(self);
 
     auto _self = reinterpret_cast<pythonBridgePytorchStateObject*>(self);
-    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParrent()->running_mutex);
+    const std::lock_guard<std::mutex> lock(_self->m_pytorchModel->getParent()->running_mutex);
     BigUInt max;
     try {
         max = _self->m_pytorchModel->getMax();
@@ -390,5 +392,5 @@ PyObject* pythonBridgePytorchState_getMax(PyObject* self, [[maybe_unused]] PyObj
         return nullptr;
     }
     auto res = max.toString();
-    return PyUnicode_DecodeUTF8(res.c_str(), res.size(), nullptr);
+    return PyUnicode_DecodeUTF8(res.c_str(), res.size(), "strict");
 }

@@ -20,12 +20,12 @@ PyObject* pythonBridgePytorchState_runWithoutDecoding(PyObject* self, PyObject* 
 PyObject* pythonBridgePytorchState_initRangeCoding(PyObject* self, PyObject* args);
 PyObject* pythonBridgePytorchState_decodeToBinaryRangeCoding(PyObject* self, PyObject* args);
 PyObject* pythonBridgePytorchState_decodeFromBinaryRangeCoding(PyObject* self, PyObject* args);
-PyObject* pythonBridgePytorchState_getMin(PyObject* self, PyObject* unused);
-PyObject* pythonBridgePytorchState_getMax(PyObject* self, PyObject* unused);
+PyObject* pythonBridgePytorchState_getMin(PyObject* self, [[maybe_unused]] PyObject* unused);
+PyObject* pythonBridgePytorchState_getMax(PyObject* self, [[maybe_unused]] PyObject* unused);
 
-PyObject* pythonBridgePytorchState_cloneDecState(PyObject* self, PyObject* unused);
-PyObject* pythonBridgePytorchState_inLasterCreatedNodes(PyObject* self, PyObject* args);
-PyObject* pythonBridgePytorchState_resetDecState(PyObject* self, PyObject* unused);
+PyObject* pythonBridgePytorchState_cloneDecState(PyObject* self, [[maybe_unused]] PyObject* unused);
+PyObject* pythonBridgePytorchState_inLastCreatedNodes(PyObject* self, PyObject* args);
+PyObject* pythonBridgePytorchState_resetDecState(PyObject* self, [[maybe_unused]] PyObject* unused);
 
 
 static PyMethodDef pythonBridgePytorchState_methods[] = {
@@ -38,7 +38,7 @@ static PyMethodDef pythonBridgePytorchState_methods[] = {
     {"decodeFromBinary", (PyCFunction)pythonBridgePytorchState_decodeFromBinary, METH_VARARGS, PyDoc_STR("Decode Input of Binary String of 1 and 0 to tokens")},
     {"runWithoutDecoding", (PyCFunction)pythonBridgePytorchState_runWithoutDecoding, METH_VARARGS, PyDoc_STR("Run the Decoder but do not generated Output")},
     {"cloneDecState", (PyCFunction)pythonBridgePytorchState_cloneDecState, METH_NOARGS, PyDoc_STR("Clone the current state of the Model")},
-    {"inLasterCreatedNodes", (PyCFunction)pythonBridgePytorchState_inLasterCreatedNodes, METH_VARARGS, PyDoc_STR("Check if string is in the last decoded tokens")},
+    {"inLastCreatedNodes", (PyCFunction)pythonBridgePytorchState_inLastCreatedNodes, METH_VARARGS, PyDoc_STR("Check if string is in the last decoded tokens")},
     {"resetDecState", (PyCFunction)pythonBridgePytorchState_resetDecState, METH_NOARGS, PyDoc_STR("Reset the state of the Model")},
     {NULL, NULL} /* Sentinel */
 };
@@ -57,9 +57,9 @@ static PyType_Slot pythonBridgePytorchState_slots[] = {
 };
 
 static PyType_Spec spec_pythonBridgePytorchState = {
-    "TorchModelCompress.pytorchModel.pytorchState",                // name
-    sizeof(pythonBridgePytorchStateObject) + sizeof(PytorchState), // basicsize
-    0,                                                             // itemsize
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,                      // flags
-    pythonBridgePytorchState_slots                                 // slots
+    "TorchModelCompress.pytorchModel.pytorchState",  // name
+    sizeof(pythonBridgePytorchStateObject),          // basicsize
+    0,                                               // itemsize
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        // flags
+    pythonBridgePytorchState_slots                   // slots
 };

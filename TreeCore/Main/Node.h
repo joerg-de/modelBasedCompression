@@ -13,9 +13,9 @@ class Node {
     Node(double prob, std::string symbol, Hidden hidden) noexcept
         : left(nullptr), right(nullptr), symbol(symbol), hidden(hidden), prob(prob) {};
     double getHuffError() const noexcept {
-        double inv_log = std::log2(1 / prob);
+        double inv_log = -std::log2(prob);
         unsigned int possible_results_low = static_cast<unsigned int>(std::floor(inv_log));
-        unsigned int possible_results_up = static_cast<unsigned int>(std::ceil(inv_log));
+        unsigned int possible_results_up = possible_results_low + 1;
 
         // 0 is not working in huffman tree
         if (possible_results_low == 0) {

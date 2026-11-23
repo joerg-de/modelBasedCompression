@@ -21,9 +21,7 @@ std::vector<bool> extract(BigUInt& Min, BigUInt& Max) {
     return ret;
 }
 bool BigUInt::getBitAt(unsigned int pos) const {
-    uint64_t cur = Value[pos / sizeof(uint64_t) / 8];
-    cur >>= pos % (sizeof(uint64_t) * 8);
-    return cur & 1;
+    return (Value[pos >> 6] >> (pos & 0x3F)) & 1;
 }
 bool BigUInt::getMSB() const {
     return getBitAt(size - 1);
@@ -56,9 +54,8 @@ bool BigUInt::operator<(const BigUInt& rhs) const {
     auto thisI = Value.rbegin();
     auto rhsI = rhs.Value.rbegin();
     while (Value.rend() != thisI) {
-        if (*thisI == *rhsI) {
-        } else {
-            return *thisI < *rhsI;
+        if (*thisI != *rhsI) {
+			return *thisI < *rhsI;
         }
         ++thisI;
         ++rhsI;
@@ -70,9 +67,8 @@ bool BigUInt::operator<(const BigUInt& rhs) const {
 bool BigUInt::operator<(unsigned int rhs) const {
     auto thisI = Value.rbegin();
     for (int i = 0; i < static_cast<int>(Value.size()) - 1; ++i) {
-        if (Value.rbegin()[i] == 0) {
-        } else {
-            return false;
+        if (Value.rbegin()[i] != 0) {
+			return false;
         }
         ++thisI;
     }
@@ -365,7 +361,7 @@ void BigUInt::print() const {
 std::string BigUInt::toString() const {
     std::string ret;
     ret.reserve(size);
-    for (auto j = size - 1; j > 0; --j)
+    for (auto j = size - 1; j >= 0; --j)
         ret.push_back(getBitAt(j) ? '1' : '0');
     return ret;
 }

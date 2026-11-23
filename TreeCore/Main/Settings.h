@@ -7,10 +7,10 @@
 	// #define ADJUST_PDF
 
 	// for speed
-	#define USE_COSTOME_ALLOC
-	// msvcrt opimisation only use with USE_COSTOME_ALLOC
-	#define MSVCRT_DEL_OPTIMIZE
-	// #define USE_COSTOME_ALLOC_CHECK
+	//#define USE_CUSTOM_ALLOC
+	// msvcrt opimisation only use with USE_CUSTOM_ALLOC
+	//#define MSVCRT_DEL_OPTIMIZE
+	// #define USE_CUSTOM_ALLOC_CHECK
 
 	// cant be 0.0078125*2 as that has max 0.0078125/2
 	// cant be 0.0078125*4 as that is max 0.0078125
@@ -20,6 +20,6 @@
 	// #define DEBUG_TREE
 #endif
 
-#define PREALLOC_FACTOR_decodeFromBinary 2
+#define PREALLOC_FACTOR_DECODE_FROM_BINARY 2
 #define PREALLOC_FACTOR_decodeToBinary 2
 // #define DEBUG_LOAD

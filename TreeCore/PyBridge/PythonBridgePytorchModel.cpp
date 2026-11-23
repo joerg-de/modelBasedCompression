@@ -1,5 +1,8 @@
 #include <Python.h>
+#include <cassert>
 #include <exception>
+#include <set>
+#include <string>
 
 #include "PythonBridgePytorchModel.h"
 #include "PythonBridgePytorchState.h"
@@ -30,7 +33,6 @@ int pythonBridgePytorchModel_init(PyObject* self, PyObject* args, PyObject* kwds
             m->pyTypeObj = nullptr;
             return -1;
         }
-        Py_INCREF(pyTypeObj);
         m->pyTypeObj = pyTypeObj;
 
     } catch (const std::exception& ex) {
@@ -56,7 +58,6 @@ void pythonBridgePytorchModel_dealloc(pythonBridgePytorchModelObject* self) {
     }
     Py_XDECREF(m->pyTypeObj);
     tp->tp_free(self);
-    Py_DECREF(tp);
 };
 
 PyObject* pythonBridgePytorchModel_clone(PyObject* self, [[maybe_unused]] PyObject* ignored) {
@@ -74,7 +75,6 @@ PyObject* pythonBridgePytorchModel_clone(PyObject* self, [[maybe_unused]] PyObje
     }
 
     PyObject* pyObj = pythonBridgePytorchModel_new(Py_TYPE(_self), nullptr, nullptr);
-    Py_INCREF(pyObj);
 
     auto _pyObj = reinterpret_cast<pythonBridgePytorchModelObject*>(pyObj);
 
@@ -100,7 +100,6 @@ PyObject* pythonBridgePytorchModel_getInitState(PyObject* self, [[maybe_unused]]
     }
 
     PyObject* pyObj = pythonBridgePytorchState_new((PyTypeObject*)(_self->pyTypeObj), nullptr, nullptr);
-    Py_INCREF(pyObj);
 
     auto _pyObj = reinterpret_cast<pythonBridgePytorchStateObject*>(pyObj);
 
@@ -125,7 +124,7 @@ PyObject* pythonBridgePytorchModel_getCharList(PyObject* self, [[maybe_unused]] 
     for (auto i : CharSet) {
         res.append(i);
     }
-    return PyUnicode_DecodeUTF8(res.c_str(), res.size(), "UTF-8 error in strings from listU8Chars");
+    return PyUnicode_DecodeUTF8(res.c_str(), res.size(), "strict");
 }
 PyObject* pythonBridgePytorchModel_loadBlacklist(PyObject* self, PyObject* args) {
     assert(self);

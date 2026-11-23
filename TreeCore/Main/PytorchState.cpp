@@ -4,7 +4,7 @@
 #include "helperFunctions.h"
 
 std::shared_ptr<PytorchState> PytorchState::cloneState() const {
-    auto ret = make_shared<PytorchState>(parrent);
+    auto ret = make_shared<PytorchState>(parent);
     ret->hiddenState = hiddenState;
     ret->hiddenStateGC = hiddenStateGC;
     ret->hiddenState.hidden = &ret->hiddenStateGC;
@@ -16,18 +16,18 @@ std::shared_ptr<PytorchState> PytorchState::cloneState() const {
     return ret;
 }
 
-PytorchState::PytorchState(std::shared_ptr<PytorchModel> parrent) {
-    this->parrent = parrent;
+PytorchState::PytorchState(std::shared_ptr<PytorchModel> parent) {
+    this->parent = parent;
     resetHidden();
 }
 
 void PytorchState::resetHidden() {
     torch::NoGradGuard no_grad;
-    if (auto Method = parrent->gettrochModel()->find_method("init_hidden")) {
+    if (auto Method = parent->gettorchModel()->find_method("init_hidden")) {
         hiddenStateGC = Method->operator()({});
         hiddenState = Hidden(&hiddenStateGC);
     } else {
-        hiddenStateGC = torch::zeros(parrent->hiddenSize);
+        hiddenStateGC = torch::zeros(parent->hiddenSize);
         hiddenState = Hidden(&hiddenStateGC);
     }
     finished = false;
@@ -40,11 +40,11 @@ void PytorchState::resetHidden() {
 void PytorchState::runForward(int nextChar, double corrVactor, const c10::IValue* in_hidden, c10::IValue* out_hidden,
                               at::Tensor* output_list) {
     static const auto opts = torch::TensorOptions().dtype(torch::kInt32);
-    int* castArray = &parrent->IdxTranslates[nextChar];
+    int* castArray = &parent->idxTranslates[nextChar];
     at::Tensor data = torch::from_blob(castArray, {1}, opts);
     std::vector<c10::IValue> FowdInput{data, *in_hidden};
     c10::IValue rawResForw;
-    rawResForw = parrent->trochModel->forward(FowdInput);
+    rawResForw = parent->torchModel->forward(FowdInput);
     auto resForw = rawResForw.toTuple()->elements();
     auto output = resForw[0];
     *out_hidden = resForw[1];
@@ -54,7 +54,7 @@ void PytorchState::runForward(int nextChar, double corrVactor, const c10::IValue
     return;
 }
 #ifdef SUPPORT_HUFFMAN
-#ifdef USE_COSTOME_ALLOC
+#ifdef USE_CUSTOM_ALLOC
 void PytorchState::model_round_to_node(Hidden& hidden, std::set<Node, std::less<Node>, stack_allocator<Node>>& IO_Nodes,
                                        double corrVactor, double base_prob, const std::string& extra_token)
 #else
@@ -71,20 +71,20 @@ void PytorchState::model_round_to_node(Hidden& hidden, std::set<Node>& IO_Nodes,
         // item is slow use data_ptr on output_list see TensorBase.h TensorBody.h make sure it is contiguous
         float* output_list = output_listKeppAlive.data_ptr<float>();
 
-        unsigned int NumToken = static_cast<unsigned int>(parrent->token.size());
+        unsigned int NumToken = static_cast<unsigned int>(parent->token.size());
         auto BloutIt = hidden.ignor.cbegin();
 
 #ifdef ADJUST_PDF
         // correct factor that cant be used such as he after an t
         double CorrSum = 0;
         for (auto i = 0; i < NumToken; ++i) {
-            auto iWord = parrent->token[i];
+            auto iWord = parent->token[i];
 
             while (SimpleSortOperator(*BloutIt, iWord) && !iWord.starts_with(*BloutIt)) [[unlikely]] {
                 ++BloutIt;
             }
             if (!iWord.starts_with(*BloutIt)) [[likely]] {
-                int idx = parrent->IdxTranslatesInverse[i];
+                int idx = parent->idxTranslatesInverse[i];
                 CorrSum += output_list[idx].item<double>();
             }
         }
@@ -95,10 +95,10 @@ void PytorchState::model_round_to_node(Hidden& hidden, std::set<Node>& IO_Nodes,
         // only soted if needed
         std::sort(hidden.ignor.begin(), hidden.ignor.end(), SimpleSortOperator);
         for (unsigned int i = 0; i < NumToken; ++i) {
-            // parrent->IdxBlacklists should already be sorted
+            // parent->idxBlacklists should already be sorted
             // the rest is only soted if needed
-            std::vector<std::string> blackList4Next = parrent->IdxBlacklists[i];
-            auto iWord = parrent->token[i];
+            std::vector<std::string> blackList4Next = parent->idxBlacklists[i];
+            auto iWord = parent->token[i];
             if (BloutIt != hidden.ignor.cend()) {
                 while (SimpleSortOperatorNoSize(*BloutIt, iWord)) [[unlikely]] {
                     ++BloutIt;
@@ -119,17 +119,17 @@ void PytorchState::model_round_to_node(Hidden& hidden, std::set<Node>& IO_Nodes,
                 }
             }
 
-            double new_prop = output_list[parrent->IdxTranslatesInverse[i]] * base_prob;
+            double new_prop = output_list[parent->idxTranslatesInverse[i]] * base_prob;
             std::string new_token = extra_token + iWord;
             IO_Nodes.emplace(new_prop, new_token, Hidden(ai_hidden_de, std::move(blackList4Next), i));
         }
     } else {
-        unsigned int NumToken = static_cast<unsigned int>(parrent->token.size());
+        unsigned int NumToken = static_cast<unsigned int>(parent->token.size());
         for (unsigned int i = 0; i < NumToken; ++i) {
-            std::string idx = parrent->token[i];
-            double new_prop = parrent->initailProp.at(idx) * base_prob;
+            std::string idx = parent->token[i];
+            double new_prop = parent->initialProp.at(idx) * base_prob;
             std::string new_token = extra_token + idx;
-            std::vector<std::string> blackout = parrent->IdxBlacklists[i];
+            std::vector<std::string> blackout = parent->idxBlacklists[i];
             IO_Nodes.emplace(new_prop, new_token, Hidden(hiddenState.hidden, blackout, i));
         }
     }
@@ -157,15 +157,15 @@ void PytorchState::initRangeCoding(unsigned int NormalBufferSize) {
     Min = BigUInt(NormalBufferSize, false);
 }
 
-double PytorchState::CorrectBlacklist(unsigned int* last, float* output_list) {
-    unsigned int NumToken = static_cast<unsigned int>(parrent->token.size());
+double PytorchState::correctBlacklist(unsigned int* last, float* output_list) {
+    unsigned int NumToken = static_cast<unsigned int>(parent->token.size());
     *last = 0;
     double ret = 0;
     auto BloutIt = hiddenState.ignor.cbegin();
     for (unsigned int i = 0; i < NumToken; ++i) {
-        // parrent->IdxBlacklists should already be sorted
+        // parent->idxBlacklists should already be sorted
         // the rest is only soted if needed
-        auto iWord = &parrent->token[i];
+        auto iWord = &parent->token[i];
         if (BloutIt != hiddenState.ignor.cend()) {
             while (SimpleSortOperatorNoSize(*BloutIt, *iWord)) [[unlikely]] {
                 ++BloutIt;
@@ -178,15 +178,15 @@ double PytorchState::CorrectBlacklist(unsigned int* last, float* output_list) {
                 }
             }
         }
-        ret += output_list[parrent->IdxTranslatesInverse[i]];
+        ret += output_list[parent->idxTranslatesInverse[i]];
         *last = i;
     }
     return ret;
 }
 
 void PytorchState::checkSize(unsigned int BufferSize) {
-    if (BufferSize <= std::ceil(std::log2(BufferSize)))
-        throw std::runtime_error("BufferSize must be bigger then std::log2(BufferSize)");
+    if (BufferSize <= std::ceil(std::log2(parent->token.size())))
+        throw std::runtime_error("BufferSize must be bigger then std::log2(number of Tokens of Model)");
 }
 
 std::tuple<std::string, int>
@@ -201,7 +201,7 @@ PytorchState::decodeFromBinaryRangeCoding(const char* data, std::function<void(u
         throw std::runtime_error("need to call initRangeCoding before using decodeFromBinaryRangeCoding");
     finished = useEndMarker;
     torch::NoGradGuard no_grad;
-    unsigned int NumToken = static_cast<unsigned int>(parrent->token.size());
+    unsigned int NumToken = static_cast<unsigned int>(parent->token.size());
 
     // guess a good value
     std::string res = "";
@@ -225,12 +225,12 @@ PytorchState::decodeFromBinaryRangeCoding(const char* data, std::function<void(u
 
             const std::string* iWord;
             unsigned int last;
-            auto corfac = CorrectBlacklist(&last, output_list);
+            auto corfac = correctBlacklist(&last, output_list);
             auto BloutIt = hiddenState.ignor.cbegin();
             for (; i < NumToken; ++i) {
-                // parrent->IdxBlacklists should already be sorted
+                // parent->idxBlacklists should already be sorted
                 // the rest is only soted if needed
-                iWord = &parrent->token[i];
+                iWord = &parent->token[i];
                 if (BloutIt != hiddenState.ignor.cend()) {
                     while (SimpleSortOperatorNoSize(*BloutIt, *iWord)) [[unlikely]] {
                         ++BloutIt;
@@ -244,7 +244,7 @@ PytorchState::decodeFromBinaryRangeCoding(const char* data, std::function<void(u
                     }
                 }
 
-                float prop = static_cast<float>(output_list[parrent->IdxTranslatesInverse[i]] / corfac);
+                float prop = static_cast<float>(output_list[parent->idxTranslatesInverse[i]] / corfac);
                 auto Current = Diff.div(prop, NumToken - i, MaxOld, Min);
                 Max = Current + Min;
 
@@ -260,7 +260,7 @@ PytorchState::decodeFromBinaryRangeCoding(const char* data, std::function<void(u
                 Min = Max;
             }
             BloutIt = hiddenState.ignor.cbegin();
-            std::vector<std::string> blackList4Next = parrent->IdxBlacklists[i];
+            std::vector<std::string> blackList4Next = parent->idxBlacklists[i];
             if (BloutIt != hiddenState.ignor.cend()) {
                 while (SimpleSortOperatorNoSize(*BloutIt, *iWord)) [[unlikely]] {
                     ++BloutIt;
@@ -284,14 +284,14 @@ PytorchState::decodeFromBinaryRangeCoding(const char* data, std::function<void(u
             leftSizeToEncode -= extracted.size();
             leftSize -= extracted.size();
             sizeToEncode -= extracted.size();
-            res.append(parrent->token[i]);
+            res.append(parent->token[i]);
             hiddenState = Hidden(hiddenState.hidden, blackList4Next, i);
 
         } else {
             unsigned int i = 0;
 
             for (; i < NumToken; ++i) {
-                double prop = parrent->initailProp.at(parrent->token[i]);
+                double prop = parent->initialProp.at(parent->token[i]);
                 auto Current = Diff.div(static_cast<float>(prop), NumToken - i, MaxOld, Min);
                 Max = Current + Min;
                 if (isInStream(Min, Max, DataAsBigUInt)) {
@@ -308,8 +308,8 @@ PytorchState::decodeFromBinaryRangeCoding(const char* data, std::function<void(u
             leftSizeToEncode -= extracted.size();
             leftSize -= extracted.size();
             sizeToEncode -= extracted.size();
-            res.append(parrent->token[i]);
-            hiddenState = Hidden(&hiddenStateGC, parrent->IdxBlacklists[i], i);
+            res.append(parent->token[i]);
+            hiddenState = Hidden(&hiddenStateGC, parent->idxBlacklists[i], i);
         }
         callBack(data - textInital);
         UpdateMinMax(Min, Max, MinUsefullBitsSize, NormalBufferSize);
@@ -338,16 +338,16 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
     if (Max.getSize() == 0)
         throw std::runtime_error("need to call initRangeCoding before using decodeToBinaryRangeCoding");
     torch::NoGradGuard no_grad;
-    unsigned int NumToken = static_cast<unsigned int>(parrent->token.size());
+    unsigned int NumToken = static_cast<unsigned int>(parent->token.size());
 
     const char* textInital = text;
 
     // guess a good value
     std::string res = "";
     signed long long leftSize = strlen(text);
-    res.reserve(leftSize * PREALLOC_FACTOR_decodeFromBinary);
+    res.reserve(leftSize * PREALLOC_FACTOR_DECODE_FROM_BINARY);
 
-    bool hiddenStateToggel = true;
+    bool hiddenStateToggle = true;
     c10::IValue hiddenStateGCAlt;
     while (*text) {
         auto Diff = Max - Min;
@@ -356,15 +356,15 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
         auto MinOld = Min;
         if (hiddenState.nextchar != -1) {
             at::Tensor output_listKeppAlive;
-            if (hiddenStateToggel)
+            if (hiddenStateToggle)
                 runForward(hiddenState.nextchar, corrVactor, &hiddenStateGC, &hiddenStateGCAlt, &output_listKeppAlive);
             else
                 runForward(hiddenState.nextchar, corrVactor, &hiddenStateGCAlt, &hiddenStateGC, &output_listKeppAlive);
-            hiddenStateToggel = !hiddenStateToggel;
+            hiddenStateToggle = !hiddenStateToggle;
             // item is slow use data_ptr on output_list see TensorBase.h TensorBody.h make sure it is contiguous
             auto output_list = output_listKeppAlive.data_ptr<float>();
 
-            unsigned int NumToken = static_cast<unsigned int>(parrent->token.size());
+            unsigned int NumToken = static_cast<unsigned int>(parent->token.size());
 
             // only soted if needed
             std::sort(hiddenState.ignor.begin(), hiddenState.ignor.end(), SimpleSortOperator);
@@ -373,25 +373,25 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
             BigUInt BestMax;
             BigUInt BestMin;
             unsigned int last;
-            auto corfac = CorrectBlacklist(&last, output_list);
+            auto corfac = correctBlacklist(&last, output_list);
             auto BloutIt = hiddenState.ignor.cbegin();
             for (unsigned int i = 0; i < NumToken; ++i) {
-                if (SimpleSortOperatorNoSize(text, parrent->token[i]))
+                if (SimpleSortOperatorNoSize(text, parent->token[i]))
                     break;
                 if (BloutIt != hiddenState.ignor.cend()) {
-                    while (SimpleSortOperatorNoSize(*BloutIt, parrent->token[i])) [[unlikely]] {
+                    while (SimpleSortOperatorNoSize(*BloutIt, parent->token[i])) [[unlikely]] {
                         ++BloutIt;
                         if (BloutIt == hiddenState.ignor.cend())
                             break;
                     }
                     if (BloutIt != hiddenState.ignor.cend()) {
-                        if (parrent->token[i].starts_with(*BloutIt)) {
+                        if (parent->token[i].starts_with(*BloutIt)) {
                             continue;
                         }
                     }
                 }
 
-                float prop = static_cast<float>(output_list[parrent->IdxTranslatesInverse[i]] / corfac);
+                float prop = static_cast<float>(output_list[parent->idxTranslatesInverse[i]] / corfac);
                 auto Current = Diff.div(prop, NumToken - i, MaxOld, Min);
                 Max = Current + Min;
 
@@ -399,9 +399,9 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
                     Max = MaxOld;
                 }
 
-                signed long long len = parrent->token[i].size();
+                signed long long len = parent->token[i].size();
                 if (len <= leftSize) [[likely]] {
-                    if (memcmp(parrent->token[i].c_str(), text, len) == 0) [[unlikely]] {
+                    if (memcmp(parent->token[i].c_str(), text, len) == 0) [[unlikely]] {
                         if (iBestLen < len) {
                             iBest = i;
                             BestMax = Max;
@@ -415,7 +415,7 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
             }
             if (iBest == -1) {
                 // rollback
-                hiddenStateToggel = !hiddenStateToggel;
+                hiddenStateToggle = !hiddenStateToggle;
                 Max = MaxOld;
                 Min = MinOld;
                 if (ignoreUnkToken) {
@@ -427,12 +427,12 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
                 }
             }
 
-            // parrent->IdxBlacklists should already be sorted
+            // parent->idxBlacklists should already be sorted
             // the rest is only sorted if needed
             std::vector<std::string> blackList4Next;
-            blackList4Next = parrent->IdxBlacklists[iBest];
+            blackList4Next = parent->idxBlacklists[iBest];
             BloutIt = hiddenState.ignor.cbegin();
-            auto iWord = parrent->token[iBest];
+            auto iWord = parent->token[iBest];
             if (BloutIt != hiddenState.ignor.cend()) {
                 while (SimpleSortOperatorNoSize(*BloutIt, iWord)) [[unlikely]] {
                     ++BloutIt;
@@ -458,7 +458,7 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
                 }
                 if (leftSize <= iBestLen + MaxBlacklistSize) {
                     // rollback
-                    hiddenStateToggel = !hiddenStateToggel;
+                    hiddenStateToggle = !hiddenStateToggle;
                     Max = MaxOld;
                     Min = MinOld;
                     break;
@@ -487,11 +487,11 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
             BigUInt BestMax;
             BigUInt BestMin;
             for (; i < NumToken; ++i) {
-                double prop = parrent->initailProp.at(parrent->token[i]);
+                double prop = parent->initialProp.at(parent->token[i]);
                 auto Current = Diff.div(static_cast<float>(prop), NumToken - i, MaxOld, Min);
                 Max = Current + Min;
-                signed long long len = parrent->token[i].size();
-                if (memcmp(parrent->token[i].c_str(), text, std::min(len, leftSize + 1)) == 0) [[unlikely]] {
+                signed long long len = parent->token[i].size();
+                if (memcmp(parent->token[i].c_str(), text, std::min(len, leftSize + 1)) == 0) [[unlikely]] {
                     if (iBestLen < len) {
                         iBest = i;
                         BestMax = Max;
@@ -521,7 +521,7 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
             }
             if (!useEndMarker) {
                 size_t MaxBlacklistSize = 0;
-                for (auto i : parrent->IdxBlacklists[iBest]) {
+                for (auto i : parent->idxBlacklists[iBest]) {
                     if (i.size() > MaxBlacklistSize)
                         MaxBlacklistSize = i.size();
                 }
@@ -539,12 +539,12 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
 
             for (auto i = extracted.rbegin(); i != extracted.rend(); ++i)
                 res.append(*i ? "1" : "0");
-            hiddenState = Hidden(hiddenState.hidden, parrent->IdxBlacklists[iBest], iBest);
+            hiddenState = Hidden(hiddenState.hidden, parent->idxBlacklists[iBest], iBest);
         }
         callBack(text - textInital);
         UpdateMinMax(Min, Max, MinUsefullBitsSize, NormalBufferSize);
     }
-    if (!hiddenStateToggel)
+    if (!hiddenStateToggle)
         hiddenStateGC = hiddenStateGCAlt;
     return std::make_tuple(res, leftSize);
 }
@@ -552,7 +552,7 @@ std::tuple<std::string, int> PytorchState::decodeToBinaryRangeCoding(const char*
 
 #ifdef SUPPORT_HUFFMAN
 bool PytorchState::inNodes(const char* toFind) const noexcept {
-#ifdef USE_COSTOME_ALLOC
+#ifdef USE_CUSTOM_ALLOC
     auto size = MainNodeAllocer.size();
     for (unsigned int i = 0; i < size; ++i) {
         if (strcmp(toFind, MainNodeAllocer.ItemAt(i)->_Myval.symbol.c_str()) == 0)
@@ -576,26 +576,24 @@ void PytorchState::initWithText(const char* text, std::function<void(unsigned lo
     if (finished)
         throw std::runtime_error("call after useEndMarker");
     torch::NoGradGuard no_grad;
-    const char* textBegin;
-
-    textBegin = text;
+    const char* textBegin = text;
+    unsigned int remainingSize = strlen(text);
 
     unsigned int maxWordlen = 0;
-    for (auto i : parrent->token)
+    for (auto i : parent->token)
         if (maxWordlen < i.size())
             maxWordlen = static_cast<unsigned int>(i.size());
     while (text[0]) {
-        unsigned int remainingSize;
         if (hiddenState.nextchar != -1) {
             runForward(hiddenState.nextchar, 1, hiddenState.hidden, &hiddenStateGC, nullptr);
             hiddenState.hidden = &hiddenStateGC;
 
             unsigned int Cns = 0;
             unsigned int lengthLongest = 0;
-            unsigned int NumToken = static_cast<unsigned int>(parrent->token.size());
+            unsigned int NumToken = static_cast<unsigned int>(parent->token.size());
             for (unsigned int Cn = 0; Cn < NumToken; ++Cn) {
-                unsigned int len = static_cast<unsigned int>(parrent->token[Cn].size());
-                if (memcmp(parrent->token[Cn].c_str(), text, len) == 0) [[unlikely]] {
+                unsigned int len = static_cast<unsigned int>(parent->token[Cn].size());
+                if (remainingSize >= len && memcmp(parent->token[Cn].c_str(), text, len) == 0) [[unlikely]] {
                     if (len > lengthLongest) {
                         Cns = Cn;
                         lengthLongest = len;
@@ -603,12 +601,12 @@ void PytorchState::initWithText(const char* text, std::function<void(unsigned lo
                 }
             }
             text += lengthLongest;
-            remainingSize = static_cast<unsigned int>(text - textBegin);
+            remainingSize -= lengthLongest;
             hiddenState.nextchar = Cns;
-            if (maxWordlen >= remainingSize && updateBlacklist) {
+            if (maxWordlen <= remainingSize && updateBlacklist) {
                 auto BloutIt = hiddenState.ignor.begin();
-                std::vector<std::string> blackList4Next = parrent->IdxBlacklists[Cns];
-                auto iWord = parrent->token[Cns];
+                std::vector<std::string> blackList4Next = parent->idxBlacklists[Cns];
+                auto iWord = parent->token[Cns];
                 if (BloutIt != hiddenState.ignor.cend()) {
                     while (SimpleSortOperatorNoSize(*BloutIt, iWord)) [[unlikely]] {
                         ++BloutIt;
@@ -634,10 +632,10 @@ void PytorchState::initWithText(const char* text, std::function<void(unsigned lo
         } else {
             int Cns = 0;
             unsigned int lengthLongest = 0;
-            unsigned int NumToken = static_cast<unsigned int>(parrent->token.size());
+            unsigned int NumToken = static_cast<unsigned int>(parent->token.size());
             for (unsigned int Cn = 0; Cn < NumToken; ++Cn) {
-                unsigned int len = static_cast<unsigned int>(parrent->token[Cn].size());
-                if (memcmp(text, parrent->token[Cn].c_str(), len) == 0) [[unlikely]] {
+                unsigned int len = static_cast<unsigned int>(parent->token[Cn].size());
+                if (remainingSize >= len && memcmp(text, parent->token[Cn].c_str(), len) == 0) [[unlikely]] {
                     if (len > lengthLongest) {
                         Cns = Cn;
                         lengthLongest = len;
@@ -645,10 +643,10 @@ void PytorchState::initWithText(const char* text, std::function<void(unsigned lo
                 }
             }
             text += lengthLongest;
-            remainingSize = static_cast<unsigned int>(text - textBegin);
+            remainingSize -= lengthLongest;
             hiddenState.nextchar = Cns;
             if (updateBlacklist)
-                hiddenState.ignor = parrent->IdxBlacklists[Cns];
+                hiddenState.ignor = parent->idxBlacklists[Cns];
         }
         callBack(remainingSize);
     }
@@ -662,39 +660,40 @@ PytorchState::decodeToBinary(const char* text, std::function<void(unsigned long 
         throw std::runtime_error("call after useEndMarker");
     finished = useEndMarker;
     torch::NoGradGuard no_grad;
-    unsigned int NumToken = static_cast<unsigned int>(parrent->token.size());
+    unsigned int NumToken = static_cast<unsigned int>(parent->token.size());
     std::vector<const Node*> stack;
     unsigned int resStak = static_cast<unsigned int>(std::sqrt((HuffMaxExtend + 1) * NumToken) * 10);
     stack.reserve(resStak);
 
     // guess a good value
     std::string res = "";
-    res.reserve(strlen(text) * PREALLOC_FACTOR_decodeToBinary);
+	size_t textSize = strlen(text);
+    res.reserve(textSize * PREALLOC_FACTOR_decodeToBinary);
 
-#if !defined(USE_COSTOME_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
     // if there is a realloc the Programm crashes so dont do it the times 2 is needed because it has right and left
-    NodesVec.reserve((HuffMaxExtend + 1) * parrent->token.size() * 2);
+    NodesVec.reserve((HuffMaxExtend + 1) * parent->token.size() * 2);
 #endif
     tensorGCVec.reserve(HuffMaxExtend);
 
-    size_t leftSize = strlen(text);
+    size_t leftSize = textSize;
     size_t lengthLongest = 0;
     unsigned int maxDestr = 0;
     const Node* bestNode;
 
     while (text[0]) {
-#if !defined(USE_COSTOME_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
         NodesVec.clear();
 #endif
-#ifdef USE_COSTOME_ALLOC
-        MainNodeAllocer.reserve(static_cast<unsigned int>((HuffMaxExtend + 1) * parrent->token.size() * 2 + 1));
+#ifdef USE_CUSTOM_ALLOC
+        MainNodeAllocer.reserve(static_cast<unsigned int>((HuffMaxExtend + 1) * parent->token.size() * 2 + 1));
 #endif
         tensorGCVec.clear();
         auto nodes = model_create_node_list(hiddenState, corrVactor, HuffMaxExtend, huffMin);
         while (nodes.size() > 1) {
             auto it = nodes.begin();
             const Node* right;
-#if defined(USE_COSTOME_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
+#if defined(USE_CUSTOM_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
             right = &(*it);
 #else
             NodesVec.emplace_back(std::move(*it));
@@ -703,7 +702,7 @@ PytorchState::decodeToBinary(const char* text, std::function<void(unsigned long 
 
             auto itnext = std::next(it);
             const Node* left;
-#if defined(USE_COSTOME_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
+#if defined(USE_CUSTOM_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
             left = &(*itnext);
 #else
             NodesVec.emplace_back(std::move(*itnext));
@@ -835,21 +834,21 @@ std::tuple<std::string, int> PytorchState::decodeFromBinary(const char* data,
 
     // guess a god value
     std::string res = "";
-    res.reserve(strlen(data) * PREALLOC_FACTOR_decodeFromBinary);
+    res.reserve(strlen(data) * PREALLOC_FACTOR_DECODE_FROM_BINARY);
 
     const Node* current = nullptr;
 
-#if !defined(USE_COSTOME_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
     // if there is a realloc the Programm crashes so dont do it the times 2 is needed because it has right and left
-    NodesVec.reserve((1 + HuffMaxExtend) * parrent->token.size() * 2);
+    NodesVec.reserve((1 + HuffMaxExtend) * parent->token.size() * 2);
 #endif
     tensorGCVec.reserve(HuffMaxExtend + 1);
 
     while (data[0]) {
-#ifdef USE_COSTOME_ALLOC
-        MainNodeAllocer.reserve(static_cast<unsigned int>((1 + HuffMaxExtend) * parrent->token.size() * 2 + 1));
+#ifdef USE_CUSTOM_ALLOC
+        MainNodeAllocer.reserve(static_cast<unsigned int>((1 + HuffMaxExtend) * parent->token.size() * 2 + 1));
 #endif
-#if !defined(USE_COSTOME_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
         NodesVec.clear();
 #endif
         tensorGCVec.clear();
@@ -860,7 +859,7 @@ std::tuple<std::string, int> PytorchState::decodeFromBinary(const char* data,
 
             auto it = nodes.begin();
             const Node* right;
-#if defined(USE_COSTOME_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
+#if defined(USE_CUSTOM_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
             right = &(*it);
 #else
             NodesVec.emplace_back(std::move(*it));
@@ -869,7 +868,7 @@ std::tuple<std::string, int> PytorchState::decodeFromBinary(const char* data,
 
             auto itnext = std::next(it);
             const Node* left;
-#if defined(USE_COSTOME_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
+#if defined(USE_CUSTOM_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
             left = &(*itnext);
 #else
             NodesVec.emplace_back(std::move(*itnext));
@@ -931,14 +930,14 @@ std::tuple<std::string, int> PytorchState::decodeFromBinary(const char* data,
     }
     return std::make_tuple(res, strlen(data));
 }
-#ifdef USE_COSTOME_ALLOC
+#ifdef USE_CUSTOM_ALLOC
 std::set<Node, std::less<Node>, stack_allocator<Node>>
 PytorchState::model_create_node_list(Hidden& hidden, double corrVactor, unsigned int HuffMaxExtend, double huffMin) {
 #else
 std::set<Node> PytorchState::model_create_node_list(Hidden& hidden, double corrVactor, unsigned int HuffMaxExtend,
                                                     double huffMin) {
 #endif
-#ifdef USE_COSTOME_ALLOC
+#ifdef USE_CUSTOM_ALLOC
     std::set<Node, std::less<Node>, stack_allocator<Node>> IO_ret_list(MainNodeAllocer);
 #else
     std::set<Node> IO_ret_list;

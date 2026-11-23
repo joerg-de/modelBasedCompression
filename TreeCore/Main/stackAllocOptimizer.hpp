@@ -129,7 +129,7 @@ public:
 #endif
 
 		m_stack_pointer += SetElementSizeMax;
-#ifdef USE_COSTOME_ALLOC_CHECK
+#ifdef USE_CUSTOM_ALLOC_CHECK
 		if ((m_stack_pointer - m_begin) / SetElementSizeMax > m_size)
 		{
 			throw std::runtime_error("alloc to much:" + std::to_string(m_size));

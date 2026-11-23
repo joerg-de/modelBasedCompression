@@ -1,16 +1,16 @@
 #pragma once
 
 unsigned int closest_power(double x) noexcept {
-    double inv_log = std::log2(1 / x);
-    unsigned int possible_results_low = static_cast<unsigned int>(std::floor(inv_log));
-    unsigned int possible_results_up = static_cast<unsigned int>(std::ceil(inv_log));
-    // 0 is not working in huffman tree
-    if (possible_results_low == 0)
-        return 1;
-    if (((1. / (1 << possible_results_low)) - x) < (x - (1. / (1 << possible_results_up))))
-        return possible_results_low;
+    if (x <= 0.0 || x > 0.375) return 1;
+    double inv_log = -std::log2(x);
+    unsigned int low = static_cast<unsigned int>(std::floor(inv_log));
+    unsigned int high = low + 1;
+	
+
+    if (((1. / (1 << low)) - x) < (x - (1. / (1 << high))))
+        return low;
     else
-        return possible_results_up;
+        return high;
 }
 
 static std::string IntToString(int data, int length) noexcept {

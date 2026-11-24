@@ -65,7 +65,7 @@ void PytorchState::model_round_to_node(Hidden& hidden, std::set<Node>& IO_Nodes,
     if (hidden.nextchar != -1) {
         at::Tensor output_listKeppAlive;
         c10::IValue ai_hidden;
-        runForward(hiddenState.nextchar, corrVactor, hidden.hidden, &ai_hidden, &output_listKeppAlive);
+        runForward(hidden.nextchar, corrVactor, hidden.hidden, &ai_hidden, &output_listKeppAlive);
         tensorGCVec.emplace_back(std::move(ai_hidden));
         auto ai_hidden_de = &(*tensorGCVec.rbegin());
         // item is slow use data_ptr on output_list see TensorBase.h TensorBody.h make sure it is contiguous
@@ -670,7 +670,7 @@ PytorchState::decodeToBinary(const char* text, std::function<void(unsigned long 
 	size_t textSize = strlen(text);
     res.reserve(textSize * PREALLOC_FACTOR_decodeToBinary);
 
-#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) || !defined(MSVCRT_DEL_OPTIMIZE)
     // if there is a realloc the Programm crashes so dont do it the times 2 is needed because it has right and left
     NodesVec.reserve((HuffMaxExtend + 1) * parent->token.size() * 2);
 #endif
@@ -682,7 +682,7 @@ PytorchState::decodeToBinary(const char* text, std::function<void(unsigned long 
     const Node* bestNode;
 
     while (text[0]) {
-#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) || !defined(MSVCRT_DEL_OPTIMIZE)
         NodesVec.clear();
 #endif
 #ifdef USE_CUSTOM_ALLOC
@@ -693,7 +693,7 @@ PytorchState::decodeToBinary(const char* text, std::function<void(unsigned long 
         while (nodes.size() > 1) {
             auto it = nodes.begin();
             const Node* right;
-#if defined(USE_CUSTOM_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
+#if defined(USE_CUSTOM_ALLOC) && defined(MSVCRT_DEL_OPTIMIZE)
             right = &(*it);
 #else
             NodesVec.emplace_back(std::move(*it));
@@ -702,7 +702,7 @@ PytorchState::decodeToBinary(const char* text, std::function<void(unsigned long 
 
             auto itnext = std::next(it);
             const Node* left;
-#if defined(USE_CUSTOM_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
+#if defined(USE_CUSTOM_ALLOC) && defined(MSVCRT_DEL_OPTIMIZE)
             left = &(*itnext);
 #else
             NodesVec.emplace_back(std::move(*itnext));
@@ -838,7 +838,7 @@ std::tuple<std::string, int> PytorchState::decodeFromBinary(const char* data,
 
     const Node* current = nullptr;
 
-#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) || !defined(MSVCRT_DEL_OPTIMIZE)
     // if there is a realloc the Programm crashes so dont do it the times 2 is needed because it has right and left
     NodesVec.reserve((1 + HuffMaxExtend) * parent->token.size() * 2);
 #endif
@@ -848,7 +848,7 @@ std::tuple<std::string, int> PytorchState::decodeFromBinary(const char* data,
 #ifdef USE_CUSTOM_ALLOC
         MainNodeAllocer.reserve(static_cast<unsigned int>((1 + HuffMaxExtend) * parent->token.size() * 2 + 1));
 #endif
-#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) || !defined(MSVCRT_DEL_OPTIMIZE)
         NodesVec.clear();
 #endif
         tensorGCVec.clear();
@@ -859,7 +859,7 @@ std::tuple<std::string, int> PytorchState::decodeFromBinary(const char* data,
 
             auto it = nodes.begin();
             const Node* right;
-#if defined(USE_CUSTOM_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
+#if defined(USE_CUSTOM_ALLOC) && defined(MSVCRT_DEL_OPTIMIZE)
             right = &(*it);
 #else
             NodesVec.emplace_back(std::move(*it));
@@ -868,7 +868,7 @@ std::tuple<std::string, int> PytorchState::decodeFromBinary(const char* data,
 
             auto itnext = std::next(it);
             const Node* left;
-#if defined(USE_CUSTOM_ALLOC) and defined(MSVCRT_DEL_OPTIMIZE)
+#if defined(USE_CUSTOM_ALLOC) && defined(MSVCRT_DEL_OPTIMIZE)
             left = &(*itnext);
 #else
             NodesVec.emplace_back(std::move(*itnext));

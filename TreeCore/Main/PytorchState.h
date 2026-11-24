@@ -94,7 +94,7 @@ class PytorchState {
     BigUInt Max;
 #endif
 #ifdef SUPPORT_HUFFMAN
-#if !defined(USE_CUSTOM_ALLOC) or !defined(MSVCRT_DEL_OPTIMIZE)
+#if !defined(USE_CUSTOM_ALLOC) || !defined(MSVCRT_DEL_OPTIMIZE)
     std::vector<Node> NodesVec;
 #endif
     // global Garbage collection Speedup

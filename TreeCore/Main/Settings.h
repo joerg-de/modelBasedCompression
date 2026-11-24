@@ -7,9 +7,9 @@
 	// #define ADJUST_PDF
 
 	// for speed
-	//#define USE_CUSTOM_ALLOC
+	#define USE_CUSTOM_ALLOC
 	// msvcrt opimisation only use with USE_CUSTOM_ALLOC
-	//#define MSVCRT_DEL_OPTIMIZE
+	#define MSVCRT_DEL_OPTIMIZE
 	// #define USE_CUSTOM_ALLOC_CHECK
 
 	// cant be 0.0078125*2 as that has max 0.0078125/2

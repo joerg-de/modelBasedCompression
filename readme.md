@@ -46,6 +46,10 @@
 - std::shared_ptr<PytorchModel> getModelAt(std::string path)
   Thread-safe singleton loader. Returns partly cached instance if already loaded, otherwise loads and caches it.
 
+### Notes
+- Callback signature: std::function<void(unsigned long long)>. The argument represents cumulative bytes processed during encoding/decoding.
+- useEndMarker: once set, the state cannot be reused for further encode/decode cycles without resetting.
+
 ## PyTorch Model Preparation & Usage
 The compression pipeline requires a compiled TorchScript model paired with auxiliary configuration files. These files can either exist alongside the `.pt` file or be embedded directly into the TorchScript archive.
 
@@ -59,10 +63,6 @@ The compression pipeline requires a compiled TorchScript model paired with auxil
 If external files are missing, the loader falls back to embedded resources stored in the TorchScript model's ExtraFilesMap. Use these exact keys when embedding: wor.wor, pro.pro, tmp.tmp, opt.opt
 External files always take precedence over embedded ones. To embed, use TorchScript's save API:
 torch::jit::save(model, "model.pt", extra_files={{"wor.wor", word_content}, {"pro.pro", prob_content}, ...});
-
-## Important Notes & Limitations
-- Callback signature: std::function<void(unsigned long long)>. The argument represents cumulative bytes processed during encoding/decoding.
-- useEndMarker: once set, the state cannot be reused for further encode/decode cycles without resetting.
 
 ## Todo
 - Null in tokens does not work yet. The text just ends there.
